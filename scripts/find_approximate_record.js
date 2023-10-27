@@ -143,20 +143,28 @@ async function findApproximateRecord(string_to_match, table_str, field_str, dist
       distance: dist_by_id[closest_record_id]["distance"]
    };
 
+   let error_response = {
+      id: null,
+      name: null,
+      field_to_check: null,
+      distance: null
+   }
+
    console.log(`Closest record: `, closest_record);
 
-   return closest_record["distance"] <= distance_threshold? closest_record : null;
+   return closest_record["distance"] <= distance_threshold? [closest_record, "success"] : [error_response, "failure"];
 };
 
 let inputConfig = Utils.getInputs();
 console.log("inputs: ", inputConfig);
 
-let closest_record = await findApproximateRecord(
+let [closest_record, status_code] = await findApproximateRecord(
    inputConfig["string_to_match"],
    inputConfig["from_table"],
    inputConfig["from_field"],
    inputConfig["distance_threshold (optional)"],
-   inputConfig["is_name"]
+   inputConfig["is_name (optional)"]
 );
 
 output.set("closest_record", closest_record);
+output.set("status_code", status_code)

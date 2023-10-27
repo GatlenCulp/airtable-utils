@@ -78,3 +78,4 @@ let matching_records = await findRecords(
 );
 console.log(matching_records);
 output.set('matching_records', matching_records);
+output.set("status_code", matching_records.length > 0 ? "success" : "failure")
