@@ -1,9 +1,9 @@
 /*
 Author: Gatlen Culp
 Last Edited: 2023 October 26th
-Title: find_approximate_record
+Title: findApproximateRecord(string_to_match, from_table, from_feild, distance_threshold)
 Description: Given a string to match and a table + field to search for a match, it returns the single closest record_id.
-Link (check for updates):
+Link (check for updates): https://github.com/GatlenCulp/airtable-utils/blob/main/scripts/find_approximate_record.js
 */
 
 class Utils {
@@ -20,14 +20,17 @@ class Utils {
             passes = (typeof(value) === 'string' || value instanceof String);
             break;
          case "number":
-            passes = typeof(value) === "number"
+            passes = typeof(value) === "number";
+            break;
+         case "boolean":
+            passes = typeof(value) == "boolean";
             break;
          default:
             throw new Error(`Type ${type_str} not supported in assertType`);
       }
       
       if (!passes) {
-         throw new Error(`Expected value of type ${type_str}, instead got ${typeof(value)}`);
+         throw new Error(`Expected value of type ${type_str}, instead got ${typeof(value)} for ${value}`);
       }
    }
 
@@ -41,7 +44,17 @@ class Utils {
 
          if (!isNaN(value)) {
             inputConfig[key] = Number(value);
-            continue
+            continue;
+         };
+
+         if (value.toLowerCase() == "true") {
+            inputConfig[key] = true;
+            continue;
+         };
+
+         if (value.toLowerCase() == "false") {
+            inputConfig[key] = false;
+            continue;
          };
 
          inputConfig[key] = value;
@@ -74,11 +87,12 @@ function levenshteinDistance (str1 = '', str2 = '') {
    return track[str2.length][str1.length];
 };
 
-async function find_approximate_record(string_to_match, table_str, field_str, distance_threshold=4) {
+async function findApproximateRecord(string_to_match, table_str, field_str, distance_threshold=10, is_name=false) {
    Utils.assertType(string_to_match, "string");
    Utils.assertType(table_str, "string");
    Utils.assertType(field_str, "string");
    Utils.assertType(distance_threshold, "number");
+   Utils.assertType(is_name, "boolean")
 
    let table = base.getTable(table_str);
    let records = await table.selectRecordsAsync({});
@@ -86,6 +100,32 @@ async function find_approximate_record(string_to_match, table_str, field_str, di
    let dist_by_id = {};
    for (let record of records) {
       let [id, name, field_to_check] = [record.id, record.name, record.getCellValue(field_str)]
+      if (is_name) {
+         let name_parts = string_to_match.split(" ");
+         let name_parts_field = field_to_check.split(" ");
+         let sum = 0;
+         // First name calculation
+         if (field_to_check == "Amalia Christina Toutziaridi") console.log(name_parts, name_parts_field);
+         sum += levenshteinDistance(name_parts.shift(), name_parts_field.shift())
+         if (field_to_check == "Amalia Christina Toutziaridi") console.log(name_parts, name_parts_field);
+         // Last name calculation
+         if (name_parts.length > 0 && name_parts_field.length > 0) {
+            sum += levenshteinDistance(name_parts.pop(), name_parts_field.pop());
+         }
+         if (field_to_check == "Amalia Christina Toutziaridi") console.log(name_parts, name_parts_field);
+         // Remaining parts
+         let least_parts = Math.min(name_parts.length, name_parts_field.length);
+         for (let i = 0; i < least_parts; i++) {
+            sum += levenshteinDistance(name_parts[i], name_parts_field[i])
+            if (field_to_check == "Amalia Christina Toutziaridi") console.log(name_parts, name_parts_field);
+         }
+         dist_by_id[id] = {
+            field_to_check: field_to_check,
+            name: name, 
+            distance: sum
+         };
+         continue;
+      }
       dist_by_id[id] = {field_to_check: field_to_check, name: name, distance: levenshteinDistance(string_to_match, field_to_check ? field_to_check : "")};
    };
 
@@ -94,27 +134,29 @@ async function find_approximate_record(string_to_match, table_str, field_str, di
    let closest_record_id = Object.entries(dist_by_id).reduce(
       (min, [id, match_info]) => match_info["distance"] < dist_by_id[min]["distance"] ? id : min, 
       Object.keys(dist_by_id)[0]
-   )
+   );
 
    let closest_record = {
       id: closest_record_id,
       name: dist_by_id[closest_record_id]["name"],
       field_to_check: dist_by_id[closest_record_id]["field_to_check"],
       distance: dist_by_id[closest_record_id]["distance"]
-   }
+   };
 
-   console.log(`Closest record: `, closest_record)
+   console.log(`Closest record: `, closest_record);
 
-   return closest_record
+   return closest_record["distance"] <= distance_threshold? closest_record : null;
 };
 
 let inputConfig = Utils.getInputs();
+console.log("inputs: ", inputConfig);
 
-let closest_record = await find_approximate_record(
+let closest_record = await findApproximateRecord(
    inputConfig["string_to_match"],
    inputConfig["from_table"],
    inputConfig["from_field"],
-   inputConfig["distance_threshold (optional)"]
+   inputConfig["distance_threshold (optional)"],
+   inputConfig["is_name"]
 );
 
 output.set("closest_record", closest_record);
