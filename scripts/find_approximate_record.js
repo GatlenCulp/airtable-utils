@@ -99,7 +99,8 @@ async function findApproximateRecord(string_to_match, table_str, field_str, dist
    records = records["records"]
    let dist_by_id = {};
    for (let record of records) {
-      let [id, name, field_to_check] = [record.id, record.name, record.getCellValue(field_str)]
+      let [id, name, field_to_check] = [record.id, record.name, record.getCellValue(field_str)];
+      if (field_to_check == null) continue;
       if (is_name) {
          let name_parts = string_to_match.split(" ");
          let name_parts_field = field_to_check.split(" ");
